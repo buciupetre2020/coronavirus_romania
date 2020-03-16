@@ -1,0 +1,81 @@
+---
+title: "Epidemia cu coronavirus în România"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    social: [ "facebook" ]
+    theme: cerulean
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+```
+
+```{r}
+library(rvest)
+library(tidyverse)
+library(sf)
+library(plotly)
+
+source("/home/petre/R/scripturi/dashboard_coronavirus.R")
+```
+
+
+Column {data-width=400}
+-----------------------------------------------------------------------
+
+### Total confirmați {data-heigth=100}
+
+```{r}
+val_total <- ansamblu %>% tail(1) %>% select(Confirmed_Total) %>% unlist() %>% unname()
+valueBox(value=val_total, icon="fa-warning", color = "warning")
+```
+
+### Curba epidemică {data-heigth=300}
+
+```{r, out.width='100%'}
+incidente <- ansamblu %>% 
+              ggplot(aes(x=Date, y=Confirmed_New, text=paste(Date, ":", Confirmed_New, "cazuri") )) + 
+              geom_col(fill="indianred3") + 
+              theme_light() + 
+              labs(x="Ziua", y="Incidența zilnică") +
+              theme(axis.text=element_text(colour="black", family = "Andale Mono"), 
+                    axis.title = element_text(colour="black", family="Andale Mono"))
+ggplotly(incidente, autosize=TRUE, tooltip = "text", dynamicTicks = TRUE) %>%
+       layout(title = list(text = paste0('Incidența zilnică a cazurilor confirmate',
+                                    '<br>',
+                                    '<sup>',
+                                    '<i>', 
+                                    'Sursa: 2020 coronavirus outbreak in Romania',
+                                    '</i>',
+                                    '</sup>'), font = list(family="Monospace", size=18, color="black"),
+                                               side="left"), margin=8) %>%
+                  style(hoverlabel = list(bgcolor="black", color="white"), hoverinfo="text")
+
+```
+
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Harta
+
+```{r, out.width='100%', out.height='100%'}
+cumulat_judet <- romania %>% 
+                  group_by(judet) %>% 
+                  summarise(Cazuri = sum(incidenta)) %>% 
+                  ungroup() 
+
+romania_harta <- harta %>% 
+                  rename(judet=mnemonic) %>% 
+                  inner_join(cumulat_judet, by="judet") %>% 
+                  ggplot() + 
+                  geom_sf(aes(fill=Cazuri, text=paste(name, "\n", Cazuri, "cazuri")), colour="white") + 
+                  geom_sf_text(aes(label = Cazuri), colour="yellow", size=3) +
+                  scale_fill_viridis_c(option="A") + 
+                  theme_light() 
+ggplotly(romania_harta, tooltip = "text", dynamicTicks = TRUE, autosize=TRUE) %>%
+                    style(hoverlabel = list(bgcolor="black", color="white"), hoverinfo="text")
+
+```
